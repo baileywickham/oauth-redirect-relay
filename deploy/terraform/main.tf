@@ -31,11 +31,12 @@ resource "aws_cloudwatch_log_group" "broker" {
   tags              = var.tags
 }
 
-# Zips deploy/terraform/lambda/, which must contain node_modules/oauth-redirect-relay.
-# Run `npm install` in that directory before `terraform apply` (see README).
+# Zips the prebuilt, dependency-free handler bundle (deploy/terraform/lambda/bundle/).
+# It is committed to the repo, so consumers need no npm install — just terraform.
+# Maintainers regenerate it with `npm install && npm run bundle` in lambda/.
 data "archive_file" "broker" {
   type        = "zip"
-  source_dir  = "${path.module}/lambda"
+  source_dir  = "${path.module}/lambda/bundle"
   output_path = "${path.module}/.build/broker.zip"
 }
 

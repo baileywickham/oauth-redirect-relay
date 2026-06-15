@@ -68,7 +68,6 @@ public Function URL (the stable HTTPS endpoint you register as your redirect URI
 
 ```bash
 cd deploy/terraform
-npm install --prefix lambda
 export TF_VAR_signing_key="$(openssl rand -hex 32)"
 terraform init && terraform apply
 terraform output broker_url

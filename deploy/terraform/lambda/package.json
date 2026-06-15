@@ -2,7 +2,13 @@
   "name": "oauth-redirect-relay-broker-lambda",
   "private": true,
   "type": "module",
+  "scripts": {
+    "bundle": "esbuild src/index.mjs --bundle --platform=node --target=node20 --format=esm --outfile=bundle/index.mjs"
+  },
   "dependencies": {
     "oauth-redirect-relay": "^0.1.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0"
   }
 }

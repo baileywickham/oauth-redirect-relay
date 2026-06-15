@@ -13,22 +13,20 @@ Lambda Function URL (HTTPS)  →  Lambda (nodejs20.x, this module)
 ## Prerequisites
 
 - Terraform >= 1.3 and AWS credentials configured (`aws configure` or env vars).
-- Node + npm (only to install the function's one dependency before packaging).
+
+That's it — the handler ships as a prebuilt, dependency-free bundle
+(`lambda/bundle/index.mjs`), so there is **no npm install** and nothing to build.
 
 ## Deploy
 
 ```bash
 cd deploy/terraform
 
-# 1. Install the function's dependency so it gets zipped into the Lambda.
-npm install --prefix lambda
-
-# 2. Provision. Pass the signing key as a variable (never commit it).
+# Pass the signing key as a variable (never commit it).
 export TF_VAR_signing_key="$(openssl rand -hex 32)"   # or your existing shared key
 terraform init
 terraform apply
 
-# 3. Grab the endpoint.
 terraform output broker_url
 # → https://<id>.lambda-url.<region>.on.aws/
 ```
@@ -37,8 +35,18 @@ Register `broker_url` as your OAuth app's redirect URI, and set each dev box's
 `redirect_uri` to it. The **same `signing_key`** must be given to the dev boxes'
 `createRelay({ signingKey })`.
 
-> Re-run `npm install --prefix lambda` and `terraform apply` after bumping the
-> `oauth-redirect-relay` version in `lambda/package.json`.
+## Updating the bundled handler (maintainers)
+
+The committed `lambda/bundle/index.mjs` pins a published `oauth-redirect-relay`
+version. To pick up a new library release, rebuild it:
+
+```bash
+cd deploy/terraform/lambda
+# bump "oauth-redirect-relay" in package.json if needed
+npm install
+npm run bundle          # esbuild → bundle/index.mjs
+git add bundle/index.mjs package.json package-lock.json
+```
 
 ## Inputs
 
@@ -76,10 +84,8 @@ output "broker_url" {
 }
 ```
 
-Note: when consumed as a remote module, run `npm install --prefix lambda` inside the
-downloaded module directory (under `.terraform/modules/...`) before `apply`, or vendor
-the dependency. For hands-off CI, the [trusted-publishing GitHub Actions](../../.github/workflows/publish.yml)
-pattern or a prebuilt bundle is a cleaner fit — see the repo README.
+Because the handler is a committed, dependency-free bundle, remote-module use needs
+nothing extra — `terraform init` fetches the module and `apply` zips the bundle as-is.
 
 ## Notes
 
