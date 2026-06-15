@@ -104,7 +104,8 @@ terraform output broker_url
 ```
 
 See [`deploy/terraform/README.md`](deploy/terraform/README.md) for inputs, outputs, and
-using it as a remote module.
+using it as a remote module, or [`deploy/pulumi/`](deploy/pulumi/README.md) for the same
+broker as a Pulumi program.
 
 ## Security notes
 
