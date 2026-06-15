@@ -14,6 +14,14 @@
   },
   "files": ["dist"],
   "keywords": ["oauth", "redirect-uri", "slack", "csrf", "hmac", "broker", "localhost", "dev"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/baileywickham/oauth-redirect-relay.git"
+  },
+  "homepage": "https://github.com/baileywickham/oauth-redirect-relay#readme",
+  "bugs": {
+    "url": "https://github.com/baileywickham/oauth-redirect-relay/issues"
+  },
   "scripts": {
     "test": "bun test",
     "build": "bun build src/index.ts --outdir dist --target node && tsc -p tsconfig.build.json",
