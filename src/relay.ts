@@ -1,4 +1,6 @@
-import { importKey, encodeState, type StatePayload } from "./state";
+import { importKey, encodeState, decodeState, type StatePayload } from "./state";
+import { isTargetAllowed } from "./allowlist";
+import { RelayError, type RelayErrorCode } from "./errors";
 
 export interface CreateRelayOptions {
   /** HMAC-SHA256 secret shared by dev box + broker. */
@@ -23,6 +25,24 @@ export interface CreateStateResult {
   nonce: string;
 }
 
+export interface HandleCallbackInput {
+  /** Full incoming request URL at the broker, including query string. */
+  url: string;
+}
+
+export interface CallbackOk {
+  status: 302;
+  location: string;
+}
+
+export interface CallbackError {
+  status: 400;
+  error: RelayErrorCode;
+  message: string;
+}
+
+export type CallbackResult = CallbackOk | CallbackError;
+
 function realNow(): number {
   return Math.floor(Date.now() / 1000);
 }
@@ -42,6 +62,11 @@ export function createRelay(options: CreateRelayOptions) {
   const now = options.now ?? realNow;
   const keyPromise = resolveKey(options.signingKey);
 
+  const allowOpts = {
+    allowLoopback: options.allowLoopback ?? true,
+    allowedOrigins: options.allowedOrigins ?? [],
+  };
+
   async function createState(input: CreateStateInput): Promise<CreateStateResult> {
     const key = await keyPromise;
     const nonce = newNonce();
@@ -55,5 +80,50 @@ export function createRelay(options: CreateRelayOptions) {
     return { state, nonce };
   }
 
-  return { createState };
+  /** Verify signature + expiry. Throws RelayError on failure. */
+  async function verifySignedState(state: string): Promise<StatePayload> {
+    const key = await keyPromise;
+    const payload = await decodeState(key, state); // throws MalformedState or InvalidSignature
+    if (now() >= payload.x) {
+      throw new RelayError("Expired", "state has expired");
+    }
+    return payload;
+  }
+
+  async function handleCallback(input: HandleCallbackInput): Promise<CallbackResult> {
+    let incoming: URL;
+    try {
+      incoming = new URL(input.url);
+    } catch {
+      return { status: 400, error: "MalformedState", message: "request url is not a url" };
+    }
+
+    const state = incoming.searchParams.get("state");
+    const code = incoming.searchParams.get("code");
+    if (!state) {
+      return { status: 400, error: "MalformedState", message: "missing state param" };
+    }
+    if (!code) {
+      return { status: 400, error: "MissingCode", message: "missing code param" };
+    }
+
+    let payload: StatePayload;
+    try {
+      payload = await verifySignedState(state);
+    } catch (err) {
+      const e = err as RelayError;
+      return { status: 400, error: e.code, message: e.message };
+    }
+
+    if (!isTargetAllowed(payload.t, allowOpts)) {
+      return { status: 400, error: "TargetNotAllowed", message: `target not allowed: ${payload.t}` };
+    }
+
+    const dest = new URL(payload.t);
+    // re-attach every param the provider sent back, so success/error params pass through
+    for (const [k, v] of incoming.searchParams) dest.searchParams.set(k, v);
+    return { status: 302, location: dest.toString() };
+  }
+
+  return { createState, handleCallback };
 }
