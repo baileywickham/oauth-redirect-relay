@@ -72,14 +72,14 @@ Mode B (lock down, no loopback): `allowLoopback: false` + an explicit `allowedOr
 `isRelayState(value)` tells a relay token apart from a legacy state, e.g. to roll out the
 relay incrementally on a callback that may still receive un-wrapped states.
 
-## Express broker
+## Hosting the broker
 
-A drop-in handler for the broker callback (zero extra deps — works with any Express app):
+`handleCallback` is framework-agnostic — it takes a URL and returns `{ status, location }`,
+so it drops into any server. See [`examples/express-broker.ts`](examples/express-broker.ts)
+for a ~30-line Express handler you can copy:
 
 ```ts
-import { expressBroker } from "oauth-redirect-relay/express";
-
-app.get("/oauth-relay/callback", expressBroker(relay));
+app.get("/oauth-relay/callback", expressBroker(relay)); // from the example
 ```
 
 ## Example broker

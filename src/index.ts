@@ -14,4 +14,3 @@ export type {
 } from "./relay";
 export { RelayError } from "./errors";
 export type { RelayErrorCode } from "./errors";
-export type { StatePayload } from "./state";

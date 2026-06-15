@@ -10,10 +10,6 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    },
-    "./express": {
-      "types": "./dist/express.d.ts",
-      "import": "./dist/express.js"
     }
   },
   "files": ["dist"],
@@ -28,7 +24,7 @@
   },
   "scripts": {
     "test": "bun test",
-    "build": "bun build src/index.ts src/express.ts --outdir dist --target node && tsc -p tsconfig.build.json",
+    "build": "bun build src/index.ts --outdir dist --target node && tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "bun run typecheck && bun test && bun run build"
   },

@@ -1,6 +1,6 @@
 import { test, expect } from "bun:test";
-import { createRelay } from "./relay";
-import { expressBroker } from "./express";
+import { createRelay } from "../src/index";
+import { expressBroker } from "./express-broker";
 
 const SECRET = "express-secret";
 const BROKER = "https://broker.example.com/oauth-relay/callback";

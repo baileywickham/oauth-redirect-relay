@@ -1,7 +1,11 @@
-import type { Relay } from "./relay";
+import type { Relay } from "../src/index";
 
-// Structural subsets of Express's req/res so this adapter needs no express
-// dependency. A real Express Request/Response satisfies these.
+// Example: an Express handler for the broker callback, built on the public API.
+// Copy this into your app — it intentionally lives in examples/, not the shipped
+// package, so the library stays framework-agnostic and zero-dep.
+//
+// Structural subsets of Express's req/res so this needs no express dependency.
+// A real Express Request/Response satisfies these.
 interface BrokerRequest {
   protocol?: string;
   originalUrl?: string;

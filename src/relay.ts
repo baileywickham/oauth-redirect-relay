@@ -210,13 +210,7 @@ export function createRelay(options: CreateRelayOptions) {
     return { target: payload.t, data: payload.d, providerState: payload.p };
   }
 
-  return {
-    createState,
-    wrapAuthorizeUrl,
-    handleCallback,
-    verifyReturn,
-    isRelayState,
-  };
+  return { createState, wrapAuthorizeUrl, handleCallback, verifyReturn };
 }
 
 /** The object returned by {@link createRelay}. */
