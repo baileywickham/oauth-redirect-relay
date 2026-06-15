@@ -13,7 +13,6 @@
     }
   },
   "files": ["dist"],
-  "sideEffects": false,
   "keywords": ["oauth", "redirect-uri", "slack", "csrf", "hmac", "broker", "localhost", "dev"],
   "scripts": {
     "test": "bun test",
