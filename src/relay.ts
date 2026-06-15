@@ -11,6 +11,11 @@ export interface CreateRelayOptions {
   allowLoopback?: boolean;
   /** Extra exact origins allowed as redirect targets. */
   allowedOrigins?: string[];
+  /**
+   * The hosted broker callback URL registered with the OAuth provider. Required
+   * to use `wrapAuthorizeUrl`; unused by the broker itself.
+   */
+  brokerUrl?: string;
   /** Injectable clock returning unix seconds. Default real time. */
   now?: () => number;
 }
@@ -18,10 +23,21 @@ export interface CreateRelayOptions {
 export interface CreateStateInput {
   target: string;
   data?: unknown;
+  /** The provider's original `state`, to preserve through the relay. */
+  providerState?: string;
 }
 
 export interface CreateStateResult {
   state: string;
+  nonce: string;
+}
+
+export interface WrapAuthorizeUrlResult {
+  /** The authorize URL rewritten to route through the broker. */
+  url: string;
+  /** The signed relay state (also embedded in `url`). */
+  state: string;
+  /** The CSRF nonce to stash (e.g. a cookie) and pass to `verifyReturn`. */
   nonce: string;
 }
 
@@ -33,13 +49,24 @@ export interface HandleCallbackInput {
 export interface VerifyReturnInput {
   /** Full URL the dev-box localhost callback was hit with. */
   url: string;
-  /** Nonce the dev box stored when it called createState. */
-  expectedNonce: string;
+  /**
+   * Nonce the dev box stored when it created the state. When omitted, the nonce
+   * check is skipped (signature + expiry are still enforced) — use this for
+   * server-initiated flows that have nowhere to stash a per-browser nonce.
+   */
+  expectedNonce?: string;
 }
 
 export interface VerifyReturnResult {
   target: string;
   data: unknown;
+  /** The provider's original `state`, if one was wrapped. */
+  providerState?: string;
+}
+
+/** True when `value` is a relay token (`<base64url>.<base64url>`). */
+export function isRelayState(value: string): boolean {
+  return /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(value);
 }
 
 export interface CallbackOk {
@@ -87,9 +114,36 @@ export function createRelay(options: CreateRelayOptions) {
       n: nonce,
       x: now() + ttlSeconds,
       ...(input.data !== undefined ? { d: input.data } : {}),
+      ...(input.providerState !== undefined ? { p: input.providerState } : {}),
     };
     const state = await encodeState(key, payload);
     return { state, nonce };
+  }
+
+  /**
+   * Rewrite a provider authorize URL to route through the broker: its
+   * `redirect_uri` becomes the broker URL and its `state` becomes a signed relay
+   * token that carries the real target + the provider's original state. Requires
+   * `brokerUrl` to have been set on the relay.
+   */
+  async function wrapAuthorizeUrl(
+    authorizeUrl: string,
+    data?: unknown,
+  ): Promise<WrapAuthorizeUrlResult> {
+    if (!options.brokerUrl) {
+      throw new Error("wrapAuthorizeUrl requires createRelay({ brokerUrl })");
+    }
+    const url = new URL(authorizeUrl);
+    const target = url.searchParams.get("redirect_uri");
+    if (!target) {
+      throw new Error("authorize url has no redirect_uri to wrap");
+    }
+    const providerState = url.searchParams.get("state") ?? undefined;
+
+    const { state, nonce } = await createState({ target, data, providerState });
+    url.searchParams.set("redirect_uri", options.brokerUrl);
+    url.searchParams.set("state", state);
+    return { url: url.toString(), state, nonce };
   }
 
   /** Verify signature + expiry. Throws RelayError on failure. */
@@ -150,11 +204,14 @@ export function createRelay(options: CreateRelayOptions) {
     if (!state) throw new RelayError("MalformedState", "missing state param");
 
     const payload = await verifySignedState(state); // throws Malformed/InvalidSignature/Expired
-    if (payload.n !== input.expectedNonce) {
+    if (input.expectedNonce !== undefined && payload.n !== input.expectedNonce) {
       throw new RelayError("NonceMismatch", "state nonce did not match stored nonce");
     }
-    return { target: payload.t, data: payload.d };
+    return { target: payload.t, data: payload.d, providerState: payload.p };
   }
 
-  return { createState, handleCallback, verifyReturn };
+  return { createState, wrapAuthorizeUrl, handleCallback, verifyReturn };
 }
+
+/** The object returned by {@link createRelay}. */
+export type Relay = ReturnType<typeof createRelay>;

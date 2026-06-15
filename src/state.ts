@@ -10,6 +10,8 @@ export interface StatePayload {
   x: number;
   /** optional signed passthrough data */
   d?: unknown;
+  /** optional provider's original `state`, preserved through the relay */
+  p?: string;
 }
 
 const encoder = new TextEncoder();
