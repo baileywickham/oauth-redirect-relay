@@ -47,8 +47,16 @@ export interface HandleCallbackInput {
 }
 
 export interface VerifyReturnInput {
-  /** Full URL the dev-box localhost callback was hit with. */
-  url: string;
+  /**
+   * Full URL the dev-box callback was hit with; the `state` param is read from
+   * it. Provide this OR `state`.
+   */
+  url?: string;
+  /**
+   * The relay state directly, when you've already parsed it off the request.
+   * Provide this OR `url`.
+   */
+  state?: string;
   /**
    * Nonce the dev box stored when it created the state. When omitted, the nonce
    * check is skipped (signature + expiry are still enforced) — use this for
@@ -194,14 +202,21 @@ export function createRelay(options: CreateRelayOptions) {
   }
 
   async function verifyReturn(input: VerifyReturnInput): Promise<VerifyReturnResult> {
-    let incoming: URL;
-    try {
-      incoming = new URL(input.url);
-    } catch {
-      throw new RelayError("MalformedState", "callback url is not a url");
+    let state = input.state;
+    if (state === undefined) {
+      if (input.url === undefined) {
+        throw new RelayError("MalformedState", "verifyReturn requires url or state");
+      }
+      let incoming: URL;
+      try {
+        incoming = new URL(input.url);
+      } catch {
+        throw new RelayError("MalformedState", "callback url is not a url");
+      }
+      const fromUrl = incoming.searchParams.get("state");
+      if (!fromUrl) throw new RelayError("MalformedState", "missing state param");
+      state = fromUrl;
     }
-    const state = incoming.searchParams.get("state");
-    if (!state) throw new RelayError("MalformedState", "missing state param");
 
     const payload = await verifySignedState(state); // throws Malformed/InvalidSignature/Expired
     if (input.expectedNonce !== undefined && payload.n !== input.expectedNonce) {
