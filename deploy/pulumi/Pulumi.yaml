@@ -1,0 +1,3 @@
+name: oauth-redirect-relay-broker
+runtime: nodejs
+description: Deploy the oauth-redirect-relay broker as an AWS Lambda + Function URL
