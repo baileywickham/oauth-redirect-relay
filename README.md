@@ -57,6 +57,9 @@ When the same server starts *and* finishes the flow and has nowhere to stash a p
 nonce, call `verifyReturn({ url })` **without** `expectedNonce`: the signature and expiry are
 still fully enforced; only the browser-binding check is skipped.
 
+`verifyReturn` also accepts the state directly — `verifyReturn({ state })` — for callbacks
+that have already parsed it off the request.
+
 ## Options
 
 | Option | Default | Meaning |

@@ -108,6 +108,33 @@ test("wrapAuthorizeUrl throws without a brokerUrl", async () => {
   ).rejects.toThrow(/brokerUrl/);
 });
 
+test("verifyReturn accepts a bare state (no URL needed)", async () => {
+  const relay = createRelay({ signingKey: SECRET, brokerUrl: BROKER, now: () => 1_000 });
+  const { state } = await relay.wrapAuthorizeUrl(
+    authorizeUrl("http://localhost:3000/cb", "PROV"),
+  );
+  const result = await relay.verifyReturn({ state });
+  expect(result.providerState).toBe("PROV");
+});
+
+test("verifyReturn with neither url nor state throws MalformedState", async () => {
+  const relay = createRelay({ signingKey: SECRET, brokerUrl: BROKER, now: () => 1_000 });
+  await expect(relay.verifyReturn({})).rejects.toMatchObject({
+    code: "MalformedState",
+  });
+});
+
+test("verifyReturn({ state }) still rejects a tampered state", async () => {
+  const relay = createRelay({ signingKey: SECRET, brokerUrl: BROKER, now: () => 1_000 });
+  const { state } = await relay.wrapAuthorizeUrl(
+    authorizeUrl("http://localhost:3000/cb", "S"),
+  );
+  const tampered = state.slice(0, -2) + (state.endsWith("aa") ? "bb" : "aa");
+  await expect(relay.verifyReturn({ state: tampered })).rejects.toMatchObject({
+    code: "InvalidSignature",
+  });
+});
+
 test("isRelayState distinguishes relay tokens from legacy base64url JSON", () => {
   expect(isRelayState("aGVsbG8.c2ln")).toBe(true);
   // legacy state: base64url(JSON) has no "." separator
