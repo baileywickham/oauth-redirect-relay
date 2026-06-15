@@ -123,8 +123,10 @@ export function createRelay(options: CreateRelayOptions) {
     try {
       payload = await verifySignedState(state);
     } catch (err) {
-      const e = err as RelayError;
-      return { status: 400, error: e.code, message: e.message };
+      if (err instanceof RelayError) {
+        return { status: 400, error: err.code, message: err.message };
+      }
+      return { status: 400, error: "MalformedState", message: "state verification failed" };
     }
 
     if (!isTargetAllowed(payload.t, allowOpts)) {

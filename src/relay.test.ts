@@ -79,6 +79,23 @@ test("handleCallback 400 TargetNotAllowed for a non-allowlisted origin", async (
   expect(result.error).toBe("TargetNotAllowed");
 });
 
+test("handleCallback never 302s a validly-signed but off-allowlist target", async () => {
+  // The state is genuinely signed by this relay (passes signature + expiry),
+  // but its target origin is not allowed — the open-redirect guard must return
+  // 400 with NO location, not a redirect to the disallowed origin.
+  const relay = createRelay({
+    signingKey: SECRET,
+    allowLoopback: false,
+    allowedOrigins: ["https://alice.dev.example.com"],
+    now: () => 1_000,
+  });
+  const { state } = await relay.createState({ target: "https://evil.example.com/callback" });
+  const result = await relay.handleCallback({ url: brokerUrl(state) });
+  expect(result.status).toBe(400);
+  expect((result as CallbackError).error).toBe("TargetNotAllowed");
+  expect((result as Partial<CallbackOk>).location).toBeUndefined();
+});
+
 test("handleCallback 400 InvalidSignature for a forged state", async () => {
   const relay = createRelay({ signingKey: SECRET, now: () => 1_000 });
   const { state } = await relay.createState({ target: "http://localhost:3000/callback" });
