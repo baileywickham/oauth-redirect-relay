@@ -44,16 +44,26 @@ Each `src` file has one responsibility and is independently testable. `relay.ts`
   "version": "0.1.0",
   "description": "Signed-state OAuth broker pattern: share one registered redirect URI across many dev boxes, safely.",
   "type": "module",
-  "module": "src/index.ts",
-  "types": "src/index.ts",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
   },
-  "files": ["src", "!src/**/*.test.ts"],
+  "files": ["dist"],
+  "sideEffects": false,
+  "keywords": ["oauth", "redirect-uri", "slack", "csrf", "hmac", "broker", "localhost", "dev"],
   "scripts": {
     "test": "bun test",
-    "build": "bun build src/index.ts --outdir dist --target node && tsc --emitDeclarationOnly --outDir dist",
-    "typecheck": "tsc --noEmit"
+    "build": "bun build src/index.ts --outdir dist --target node && tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "bun run typecheck && bun test && bun run build"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "license": "MIT",
   "devDependencies": {
@@ -62,6 +72,12 @@ Each `src` file has one responsibility and is independently testable. `relay.ts`
   }
 }
 ```
+
+Entry points target built `dist/` so npm consumers get compiled JS + `.d.ts`, while the
+tests and the example import from `src/` via relative paths (never through the package
+name), so local development still runs straight off TypeScript. `prepublishOnly` gates
+every publish on a clean typecheck, green tests, and a fresh build. `files: ["dist"]` keeps
+`src/` and tests out of the tarball.
 
 - [ ] **Step 2: Write tsconfig.json**
 
@@ -85,15 +101,34 @@ Each `src` file has one responsibility and is independently testable. `relay.ts`
 
 The `DOM` lib provides Web Crypto (`crypto.subtle`, `CryptoKey`) types.
 
-- [ ] **Step 3: Install dev deps**
+- [ ] **Step 3: Write tsconfig.build.json**
+
+A separate config for declaration emit so only `src` (minus tests) lands in `dist`. The
+main `tsconfig.json` still includes `examples` for editor/typecheck, but the published
+build must not ship example or test `.d.ts`.
+
+```json
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "emitDeclarationOnly": true,
+    "outDir": "dist",
+    "noEmit": false
+  },
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts"]
+}
+```
+
+- [ ] **Step 4: Install dev deps**
 
 Run: `bun install`
 Expected: creates `bun.lockb`, installs typescript + @types/bun, no errors.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add package.json tsconfig.json bun.lockb
+git add package.json tsconfig.json tsconfig.build.json bun.lockb
 git commit -m "chore: scaffold oauth-redirect-relay package"
 ```
 
@@ -1267,6 +1302,46 @@ git commit -m "docs: README with usage, options, and security notes"
 
 ---
 
+## Task 12: Publish to npm
+
+**Files:** none (publishing the existing build).
+
+Publishing to public npm under the unscoped name `oauth-redirect-relay`. This task is run
+manually once the package is green; it is not a code change.
+
+- [ ] **Step 1: Confirm the name is available**
+
+Run: `npm view oauth-redirect-relay version`
+Expected: `npm error 404` (name unclaimed). If it returns a version, the name is taken —
+pick a scoped name (`@<your-npm-user>/oauth-redirect-relay`), update `package.json` `name`,
+and keep `publishConfig.access: "public"`.
+
+- [ ] **Step 2: Verify you are logged in**
+
+Run: `npm whoami`
+Expected: prints your npm username. If not, run `npm login` (interactive — run it yourself
+in the terminal).
+
+- [ ] **Step 3: Inspect the tarball contents**
+
+Run: `npm pack --dry-run`
+Expected: the file list contains only `dist/index.js`, `dist/index.d.ts`, `package.json`,
+`README.md`, `LICENSE` (if present) — and **no** `src/`, `*.test.ts`, or `examples/`.
+`prepublishOnly` runs typecheck + tests + build first; all must pass.
+
+- [ ] **Step 4: Publish**
+
+Run: `npm publish`
+Expected: `+ oauth-redirect-relay@0.1.0`. (`publishConfig.access: "public"` makes this work
+even if you later switch to a scoped name.)
+
+- [ ] **Step 5: Verify the published package**
+
+Run: `npm view oauth-redirect-relay`
+Expected: shows version `0.1.0` and the `dist`-based entry points.
+
+---
+
 ## Self-Review Notes
 
 - **Spec coverage:** factory + 3 methods (Tasks 6–8), Web Crypto HMAC (Task 4), base64url
@@ -1275,6 +1350,10 @@ git commit -m "docs: README with usage, options, and security notes"
   clock for deterministic expiry tests (Tasks 6–8), example Bun broker + smoke test (Task
   10), module layout matches the spec's `src/` list (all tasks), PKCE/token-exchange
   explicitly out of scope (README + no task). All spec sections map to a task.
+- **Publish-readiness:** package entry points target built `dist/` with `files: ["dist"]`,
+  a build-only tsconfig keeps tests/examples out of the tarball, `prepublishOnly` gates on
+  typecheck+tests+build, and Task 12 covers name-availability, `npm pack` inspection, and
+  publish for public unscoped npm.
 - **Type consistency:** `StatePayload` fields `{ t, n, x, d }` used identically in Tasks 4,
   6, 7, 8. `CallbackOk.location` / `CallbackError.error` consistent across Tasks 7, 9, 10.
   `verifySignedState` defined in Task 7 and reused in Task 8.
