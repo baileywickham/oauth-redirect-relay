@@ -9,6 +9,6 @@
     "oauth-redirect-relay": "^0.1.0"
   },
   "devDependencies": {
-    "esbuild": "^0.24.0"
+    "esbuild": "^0.28.1"
   }
 }
