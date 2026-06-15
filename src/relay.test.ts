@@ -96,3 +96,52 @@ test("handleCallback 400 MalformedState when state param missing", async () => {
   expect(result.status).toBe(400);
   expect(result.error).toBe("MalformedState");
 });
+
+// --- Task 8: verifyReturn tests ---
+
+function localhostUrl(state: string, code = "auth-code-123"): string {
+  const u = new URL("http://localhost:3000/callback");
+  u.searchParams.set("code", code);
+  u.searchParams.set("state", state);
+  return u.toString();
+}
+
+test("verifyReturn returns target+data when nonce matches", async () => {
+  const relay = createRelay({ signingKey: SECRET, now: () => 1_000 });
+  const { state, nonce } = await relay.createState({
+    target: "http://localhost:3000/callback",
+    data: { provider: "slack" },
+  });
+
+  const result = await relay.verifyReturn({
+    url: localhostUrl(state),
+    expectedNonce: nonce,
+  });
+  expect(result.target).toBe("http://localhost:3000/callback");
+  expect(result.data).toEqual({ provider: "slack" });
+});
+
+test("verifyReturn throws NonceMismatch on wrong nonce", async () => {
+  const relay = createRelay({ signingKey: SECRET, now: () => 1_000 });
+  const { state } = await relay.createState({ target: "http://localhost:3000/callback" });
+  await expect(
+    relay.verifyReturn({ url: localhostUrl(state), expectedNonce: "not-the-nonce" }),
+  ).rejects.toMatchObject({ code: "NonceMismatch" });
+});
+
+test("verifyReturn throws Expired past exp", async () => {
+  let clock = 1_000;
+  const relay = createRelay({ signingKey: SECRET, ttlSeconds: 10, now: () => clock });
+  const { state, nonce } = await relay.createState({ target: "http://localhost:3000/callback" });
+  clock = 2_000;
+  await expect(
+    relay.verifyReturn({ url: localhostUrl(state), expectedNonce: nonce }),
+  ).rejects.toMatchObject({ code: "Expired" });
+});
+
+test("verifyReturn throws MalformedState when state param absent", async () => {
+  const relay = createRelay({ signingKey: SECRET, now: () => 1_000 });
+  await expect(
+    relay.verifyReturn({ url: "http://localhost:3000/callback?code=x", expectedNonce: "n" }),
+  ).rejects.toMatchObject({ code: "MalformedState" });
+});

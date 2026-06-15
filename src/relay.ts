@@ -30,6 +30,18 @@ export interface HandleCallbackInput {
   url: string;
 }
 
+export interface VerifyReturnInput {
+  /** Full URL the dev-box localhost callback was hit with. */
+  url: string;
+  /** Nonce the dev box stored when it called createState. */
+  expectedNonce: string;
+}
+
+export interface VerifyReturnResult {
+  target: string;
+  data: unknown;
+}
+
 export interface CallbackOk {
   status: 302;
   location: string;
@@ -125,5 +137,22 @@ export function createRelay(options: CreateRelayOptions) {
     return { status: 302, location: dest.toString() };
   }
 
-  return { createState, handleCallback };
+  async function verifyReturn(input: VerifyReturnInput): Promise<VerifyReturnResult> {
+    let incoming: URL;
+    try {
+      incoming = new URL(input.url);
+    } catch {
+      throw new RelayError("MalformedState", "callback url is not a url");
+    }
+    const state = incoming.searchParams.get("state");
+    if (!state) throw new RelayError("MalformedState", "missing state param");
+
+    const payload = await verifySignedState(state); // throws Malformed/InvalidSignature/Expired
+    if (payload.n !== input.expectedNonce) {
+      throw new RelayError("NonceMismatch", "state nonce did not match stored nonce");
+    }
+    return { target: payload.t, data: payload.d };
+  }
+
+  return { createState, handleCallback, verifyReturn };
 }
