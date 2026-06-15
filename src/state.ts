@@ -44,7 +44,7 @@ export async function decodeState(key: CryptoKey, token: string): Promise<StateP
   // If the segment is not valid base64url, atob throws and we surface
   // MalformedState immediately — an attacker cannot reach verify or JSON.parse
   // with an unsigned payload.
-  let sigBytes: Uint8Array;
+  let sigBytes: Uint8Array<ArrayBuffer>;
   try {
     sigBytes = base64urlToBytes(sigSegment);
   } catch {
