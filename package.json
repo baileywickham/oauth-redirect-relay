@@ -1,6 +1,6 @@
 {
   "name": "oauth-redirect-relay",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Signed-state OAuth broker pattern: share one registered redirect URI across many dev boxes, safely.",
   "type": "module",
   "main": "./dist/index.js",
@@ -10,6 +10,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./express": {
+      "types": "./dist/express.d.ts",
+      "import": "./dist/express.js"
     }
   },
   "files": ["dist"],
@@ -24,7 +28,7 @@
   },
   "scripts": {
     "test": "bun test",
-    "build": "bun build src/index.ts --outdir dist --target node && tsc -p tsconfig.build.json",
+    "build": "bun build src/index.ts src/express.ts --outdir dist --target node && tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "bun run typecheck && bun test && bun run build"
   },

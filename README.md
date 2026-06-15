@@ -19,41 +19,68 @@ bun add oauth-redirect-relay
 
 ## Flow
 
+The easiest path: hand it the authorize URL your OAuth client already builds, and the
+relay rewrites the `redirect_uri` to the broker and signs the `state` for you.
+
 ```ts
 import { createRelay } from "oauth-redirect-relay";
 
-const relay = createRelay({ signingKey: process.env.RELAY_SIGNING_KEY! });
-
-// 1. dev box: start the flow
-const { state, nonce } = await relay.createState({
-  target: "http://localhost:3000/callback",
-  data: { provider: "slack" },
+const relay = createRelay({
+  signingKey: process.env.RELAY_SIGNING_KEY!,
+  brokerUrl: "https://broker.example.com/oauth-relay/callback",
 });
-// store `nonce` (cookie), send user to the provider with
-//   redirect_uri = <BROKER_URL>,  state = <state>
+
+// 1. dev box: wrap the provider authorize URL, then redirect the user to it
+const { url, nonce } = await relay.wrapAuthorizeUrl(googleAuthUrl);
+// (optionally) stash `nonce` in a short-lived cookie, then redirect to `url`
 
 // 2. broker (the one registered HTTPS callback)
 const result = await relay.handleCallback({ url: req.url });
 // → { status: 302, location } | { status: 400, error, message }
 
 // 3. dev box: finish the flow at your localhost callback
-const { target, data } = await relay.verifyReturn({
+const { target, providerState, data } = await relay.verifyReturn({
   url: req.url,
-  expectedNonce: storedNonce,
+  expectedNonce: storedNonce, // omit to enforce signature + expiry only
 });
-// then do your own token exchange with the `code`
+// `providerState` is the OAuth `state` your client originally set — verify it as usual,
+// then do your own token exchange (use the broker URL as redirect_uri).
 ```
+
+`wrapAuthorizeUrl` preserves the provider's original `state` (returned as `providerState`)
+and any other query params. For full control, the lower-level `createState({ target, data,
+providerState })` builds a signed state directly.
+
+### Server-initiated flows (no per-browser nonce)
+
+When the same server starts *and* finishes the flow and has nowhere to stash a per-browser
+nonce, call `verifyReturn({ url })` **without** `expectedNonce`: the signature and expiry are
+still fully enforced; only the browser-binding check is skipped.
 
 ## Options
 
 | Option | Default | Meaning |
 |--------|---------|---------|
 | `signingKey` | — | HMAC-SHA256 secret (string) or `CryptoKey`, shared by dev box + broker |
+| `brokerUrl` | — | Broker callback URL; required for `wrapAuthorizeUrl` |
 | `ttlSeconds` | `600` | Signed lifetime of a state |
 | `allowLoopback` | `true` | Allow `http://localhost` / `127.0.0.1` on any port (mode A) |
 | `allowedOrigins` | `[]` | Extra exact origins allowed as targets |
 
 Mode B (lock down, no loopback): `allowLoopback: false` + an explicit `allowedOrigins` list.
+
+`isRelayState(value)` tells a relay token apart from a legacy state, e.g. to roll out the
+relay incrementally on a callback that may still receive un-wrapped states.
+
+## Express broker
+
+A drop-in handler for the broker callback (zero extra deps — works with any Express app):
+
+```ts
+import { expressBroker } from "oauth-redirect-relay/express";
+
+app.get("/oauth-relay/callback", expressBroker(relay));
+```
 
 ## Example broker
 
