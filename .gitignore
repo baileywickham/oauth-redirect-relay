@@ -1,2 +1,11 @@
 node_modules
 dist
+
+# terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+deploy/terraform/.build/
+crash.log
+*.tfvars

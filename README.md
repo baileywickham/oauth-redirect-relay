@@ -61,6 +61,22 @@ Mode B (lock down, no loopback): `allowLoopback: false` + an explicit `allowedOr
 RELAY_SIGNING_KEY=your-secret bun examples/broker.ts
 ```
 
+## Deploy a broker
+
+The broker is stateless — one route, one secret. Deploy it to AWS as a Lambda behind a
+public Function URL (the stable HTTPS endpoint you register as your redirect URI):
+
+```bash
+cd deploy/terraform
+npm install --prefix lambda
+export TF_VAR_signing_key="$(openssl rand -hex 32)"
+terraform init && terraform apply
+terraform output broker_url
+```
+
+See [`deploy/terraform/README.md`](deploy/terraform/README.md) for inputs, outputs, and
+using it as a remote module.
+
 ## Security notes
 
 - The allowlist is what stops this from being an open redirect — keep `allowLoopback: false`
